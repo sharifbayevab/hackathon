@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white border rounded-2xl p-6">
+  <div class="flex items-baseline justify-between mb-4">
+    <h1 class="text-2xl font-semibold">{{ t('leaderboard_title') }}</h1>
+    <span class="text-sm text-slate-500">
+      {% if use_private %}
+        {{ t('leaderboard_private_note') }}
+      {% else %}
+        {{ t('leaderboard_public_note') }}
+      {% endif %}
+    </span>
+  </div>
+
+  {% if not competition %}
+    <p class="text-slate-500">{{ t('no_active_task') }}</p>
+  {% elif not rows %}
+    <p class="text-slate-500">{{ t('leaderboard_empty') }}</p>
+  {% else %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 border-b">
+          <tr>
+            <th class="py-2 w-12">{{ t('rank') }}</th>
+            <th>{{ t('participant') }}</th>
+            <th>{{ t('group') }}</th>
+            <th class="text-right">{{ t('score') }}</th>
+            <th class="text-right">{{ t('submissions_count') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr class="border-b last:border-0 {% if participant and row.participant_id == participant.id %}bg-amber-50{% endif %}">
+              <td class="py-2 font-mono">
+                {% if row.rank == 1 %}🥇{% elif row.rank == 2 %}🥈{% elif row.rank == 3 %}🥉{% else %}{{ row.rank }}{% endif %}
+              </td>
+              <td class="font-medium">{{ row.full_name }}</td>
+              <td class="text-slate-600">{{ row.group_name }}</td>
+              <td class="text-right font-mono">{{ row.score|score }}</td>
+              <td class="text-right text-slate-500">{{ row.submissions_count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

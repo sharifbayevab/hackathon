@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not competition %}
+  <div class="bg-white border rounded-2xl p-8 text-center text-slate-600">
+    {{ t('no_active_task') }}
+  </div>
+{% else %}
+  {% if flash == 'ok' %}
+    <div class="mb-4 p-3 bg-green-50 text-green-700 rounded">
+      {{ t('submitted_ok', score=flash_score) }}
+    </div>
+  {% endif %}
+  {% if flash_error %}
+    <div class="mb-4 p-3 bg-red-50 text-red-700 rounded">
+      {{ t('submitted_failed', error=flash_error) }}
+    </div>
+  {% endif %}
+
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="md:col-span-2 bg-white border rounded-2xl p-6">
+      <h1 class="text-2xl font-semibold mb-2">{{ competition.title or t('task_title') }}</h1>
+      <div class="flex flex-wrap gap-4 text-sm text-slate-600 mb-4">
+        <span><b>{{ t('metric') }}:</b> {{ competition.metric }}</span>
+        <span><b>{{ t('deadline') }}:</b>
+          {% if deadline_passed %}
+            <span class="text-red-600">{{ t('deadline_passed') }}</span>
+          {% elif competition.deadline %}
+            {{ competition.deadline|dt }}{% if time_left %} · {{ time_left }}{% endif %}
+          {% else %}
+            {{ t('n_a') }}
+          {% endif %}
+        </span>
+      </div>
+      <div class="prose prose-slate max-w-none whitespace-pre-wrap">{{ competition.description }}</div>
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        {% if competition.train_path %}
+          <a href="/download/train" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">
+            ⬇ {{ t('download_train') }}
+          </a>
+        {% endif %}
+        {% if competition.sample_submission_path %}
+          <a href="/download/sample" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm">
+            ⬇ {{ t('download_sample') }}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white border rounded-2xl p-6">
+      <h2 class="font-semibold mb-3">{{ t('submit_title') }}</h2>
+      {% if deadline_passed %}
+        <p class="text-sm text-red-600">{{ t('submit_disabled_deadline') }}</p>
+      {% else %}
+        <p class="text-xs text-slate-500 mb-3">
+          {{ t('submit_hint', id_col=competition.id_column, answer_col=competition.answer_column) }}
+        </p>
+        <form method="post" action="/submit" enctype="multipart/form-data" class="space-y-3">
+          <input type="file" name="file" accept=".csv" required
+                 class="block w-full text-sm">
+          <button type="submit"
+                  class="w-full bg-slate-900 text-white py-2 rounded-lg hover:bg-slate-800">
+            {{ t('submit_button') }}
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="mt-8 bg-white border rounded-2xl p-6">
+    <h2 class="font-semibold mb-3">{{ t('submissions_history') }}</h2>
+    {% if submissions %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="text-left text-slate-500 border-b">
+            <tr>
+              <th class="py-2">{{ t('submission_time') }}</th>
+              <th>{{ t('submission_status') }}</th>
+              <th>{{ t('submission_score') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in submissions %}
+              <tr class="border-b last:border-0">
+                <td class="py-2">{{ s.created_at|dt }}</td>
+                <td>
+                  {% if s.status == 'scored' %}
+                    <span class="text-green-700">✓</span>
+                  {% else %}
+                    <span class="text-red-700" title="{{ s.error_message }}">✗ {{ s.error_message }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ s.public_score|score }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-500">{{ t('no_submissions') }}</p>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

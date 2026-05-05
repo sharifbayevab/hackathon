@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">{{ t('admin_dashboard') }}</h1>
+  <div class="flex gap-3 text-sm">
+    <a href="/admin/submissions" class="text-slate-700 hover:text-blue-600">{{ t('admin_submissions') }}</a>
+    <a href="/admin/logout" class="text-slate-500 hover:text-red-600">{{ t('nav_logout') }}</a>
+  </div>
+</div>
+
+{% if flash == 'saved' %}
+  <div class="mb-4 p-3 bg-green-50 text-green-700 rounded">{{ t('admin_competition_saved') }}</div>
+{% elif flash == 'gt_uploaded' %}
+  <div class="mb-4 p-3 bg-green-50 text-green-700 rounded">
+    {{ t('admin_groundtruth_uploaded', public=request.query_params.get('public'), private=request.query_params.get('private')) }}
+  </div>
+{% elif flash == 'rescored' %}
+  <div class="mb-4 p-3 bg-green-50 text-green-700 rounded">{{ t('admin_rescored') }}</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 bg-white border rounded-2xl p-6">
+    <h2 class="font-semibold mb-4">{{ t('admin_competition') }}</h2>
+    <form method="post" action="/admin/competition" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">{{ t('admin_title') }}</label>
+        <input name="title" value="{{ competition.title if competition else '' }}"
+               class="w-full border rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">{{ t('admin_description') }}</label>
+        <textarea name="description" rows="6"
+                  class="w-full border rounded-lg px-3 py-2 font-mono text-sm">{{ competition.description if competition else '' }}</textarea>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ t('admin_metric') }}</label>
+          <select name="metric" class="w-full border rounded-lg px-3 py-2">
+            {% for m in metrics %}
+              <option value="{{ m }}" {% if competition and competition.metric == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ t('admin_deadline') }}</label>
+          <input type="datetime-local" name="deadline"
+                 value="{% if competition and competition.deadline %}{{ competition.deadline.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ t('admin_id_column') }}</label>
+          <input name="id_column" value="{{ competition.id_column if competition else 'id' }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ t('admin_answer_column') }}</label>
+          <input name="answer_column" value="{{ competition.answer_column if competition else 'answer' }}"
+                 class="w-full border rounded-lg px-3 py-2">
+        </div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ t('admin_train_file') }}</label>
+          <input type="file" name="train_file" accept=".csv" class="block w-full text-sm">
+          {% if competition and competition.train_path %}
+            <p class="text-xs text-green-700 mt-1">✓ uploaded</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ t('admin_sample_file') }}</label>
+          <input type="file" name="sample_file" accept=".csv" class="block w-full text-sm">
+          {% if competition and competition.sample_submission_path %}
+            <p class="text-xs text-green-700 mt-1">✓ uploaded</p>
+          {% endif %}
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="is_active" {% if not competition or competition.is_active %}checked{% endif %}>
+        {{ t('admin_active') }}
+      </label>
+      <button type="submit" class="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800">
+        {{ t('admin_save') }}
+      </button>
+    </form>
+  </div>
+
+  <div class="space-y-6">
+    <div class="bg-white border rounded-2xl p-6">
+      <h2 class="font-semibold mb-2">Groundtruth</h2>
+      <p class="text-xs text-slate-500 mb-3">CSV: {{ competition.id_column if competition else 'id' }}, {{ competition.answer_column if competition else 'answer' }}, split (public/private)</p>
+      {% if competition %}
+        <form method="post" action="/admin/groundtruth" enctype="multipart/form-data" class="space-y-3">
+          <input type="file" name="file" accept=".csv" required class="block w-full text-sm">
+          <button type="submit" class="w-full bg-slate-900 text-white py-2 rounded-lg hover:bg-slate-800">
+            {{ t('admin_save') }}
+          </button>
+        </form>
+        {% if competition.groundtruth_path %}
+          <p class="text-xs text-green-700 mt-3">✓ groundtruth загружен</p>
+        {% endif %}
+      {% else %}
+        <p class="text-sm text-slate-500">{{ t('admin_no_competition') }}</p>
+      {% endif %}
+    </div>
+
+    <div class="bg-white border rounded-2xl p-6">
+      <h2 class="font-semibold mb-2">Stats</h2>
+      <div class="text-sm space-y-1">
+        <div>{{ t('participant') }}: <b>{{ total_participants }}</b></div>
+        <div>{{ t('admin_submissions') }}: <b>{{ total_submissions }}</b></div>
+      </div>
+      {% if competition and competition.groundtruth_path %}
+        <form method="post" action="/admin/rescore" class="mt-4">
+          <button type="submit"
+                  onclick="return confirm('Rescore all submissions?')"
+                  class="w-full bg-amber-100 text-amber-800 py-2 rounded-lg hover:bg-amber-200 text-sm">
+            ↻ {{ t('admin_rescore') }}
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

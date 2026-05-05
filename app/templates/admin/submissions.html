@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">{{ t('admin_submissions') }}</h1>
+  <a href="/admin" class="text-sm text-slate-600 hover:text-blue-600">← {{ t('admin_back_to_dashboard') }}</a>
+</div>
+
+<div class="bg-white border rounded-2xl p-6">
+  {% if items %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 border-b">
+          <tr>
+            <th class="py-2">{{ t('submission_time') }}</th>
+            <th>{{ t('participant') }}</th>
+            <th>{{ t('group') }}</th>
+            <th>{{ t('submission_status') }}</th>
+            <th class="text-right">public</th>
+            <th class="text-right">private</th>
+            <th>{{ t('admin_actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sub, p in items %}
+            <tr class="border-b last:border-0">
+              <td class="py-2 whitespace-nowrap">{{ sub.created_at|dt }}</td>
+              <td>{{ p.full_name }}</td>
+              <td class="text-slate-600">{{ p.group_name }}</td>
+              <td>
+                {% if sub.status == 'scored' %}
+                  <span class="text-green-700">✓</span>
+                {% else %}
+                  <span class="text-red-700" title="{{ sub.error_message }}">✗</span>
+                {% endif %}
+              </td>
+              <td class="text-right font-mono">{{ sub.public_score|score }}</td>
+              <td class="text-right font-mono">{{ sub.private_score|score }}</td>
+              <td>
+                <form method="post" action="/admin/submissions/{{ sub.id }}/delete">
+                  <button type="submit" onclick="return confirm('Delete?')"
+                          class="text-xs text-red-600 hover:underline">
+                    {{ t('admin_delete_submission') }}
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-slate-500">{{ t('no_submissions') }}</p>
+  {% endif %}
+</div>
+{% endblock %}
