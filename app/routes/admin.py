@@ -3,11 +3,14 @@ from __future__ import annotations
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
-from sqlalchemy import distinct, func, select
+from sqlalchemy import delete, distinct, func, select
 from sqlalchemy.orm import Session
+
+TASHKENT = ZoneInfo("Asia/Tashkent")
 
 from app.auth import (
     clear_admin_cookie,
@@ -104,6 +107,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 def _parse_deadline(raw: str | None) -> datetime | None:
+    """Parse `<input type=datetime-local>` value as Tashkent local time."""
     if not raw:
         return None
     raw = raw.strip()
@@ -114,15 +118,24 @@ def _parse_deadline(raw: str | None) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+        dt = dt.replace(tzinfo=TASHKENT)
+    return dt.astimezone(timezone.utc)
+
+
+async def _read_md(upload: UploadFile | None) -> str | None:
+    if upload is None or not upload.filename:
+        return None
+    raw = await upload.read()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, f"{upload.filename}: file is not valid UTF-8")
 
 
 @router.post("/competition")
 async def upsert_competition(
     request: Request,
     title: str = Form(""),
-    description: str = Form(""),
     metric: str = Form(Metric.accuracy.value),
     deadline: str = Form(""),
     id_column: str = Form("id"),
@@ -130,6 +143,9 @@ async def upsert_competition(
     is_active: str = Form("on"),
     train_file: UploadFile | None = File(None),
     sample_file: UploadFile | None = File(None),
+    description_uz_file: UploadFile | None = File(None),
+    description_ru_file: UploadFile | None = File(None),
+    description_en_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
     _require_admin(request, db)
@@ -142,12 +158,22 @@ async def upsert_competition(
         db.add(competition)
 
     competition.title = title.strip()
-    competition.description = description
     competition.metric = metric
     competition.deadline = _parse_deadline(deadline)
     competition.id_column = (id_column.strip() or "id")
     competition.answer_column = (answer_column.strip() or "answer")
     competition.is_active = is_active == "on"
+
+    uz = await _read_md(description_uz_file)
+    ru = await _read_md(description_ru_file)
+    en = await _read_md(description_en_file)
+    if uz is not None:
+        competition.description_uz = uz
+    if ru is not None:
+        competition.description_ru = ru
+    if en is not None:
+        competition.description_en = en
+
     db.flush()
 
     if train_file is not None and train_file.filename:
@@ -256,6 +282,58 @@ def delete_submission(submission_id: int, request: Request, db: Session = Depend
     sub = db.get(Submission, submission_id)
     if sub is None:
         raise HTTPException(404)
+    file_path = sub.file_path
     db.delete(sub)
     db.commit()
+    Path(file_path).unlink(missing_ok=True)
     return RedirectResponse("/admin/submissions", status_code=303)
+
+
+@router.post("/submissions/clear")
+def clear_all_submissions(request: Request, db: Session = Depends(get_db)):
+    _require_admin(request, db)
+    competition = get_active_competition(db)
+    if competition is None:
+        return RedirectResponse("/admin/submissions", status_code=303)
+
+    paths = list(
+        db.scalars(
+            select(Submission.file_path).where(Submission.competition_id == competition.id)
+        ).all()
+    )
+    db.execute(delete(Submission).where(Submission.competition_id == competition.id))
+    db.commit()
+
+    for p in paths:
+        Path(p).unlink(missing_ok=True)
+
+    return RedirectResponse("/admin/submissions?flash=cleared", status_code=303)
+
+
+@router.post("/reset")
+def reset_everything(
+    request: Request,
+    confirm: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Wipe everything except the admin account, ready for a new task."""
+    _require_admin(request, db)
+    if confirm.strip().upper() != "RESET":
+        return RedirectResponse("/admin?flash=reset_cancelled", status_code=303)
+
+    sub_paths = list(db.scalars(select(Submission.file_path)).all())
+    db.execute(delete(Submission))
+    db.execute(delete(Participant))
+    db.execute(delete(Competition))
+    db.commit()
+
+    for p in sub_paths:
+        Path(p).unlink(missing_ok=True)
+    for p in settings.assets_dir.glob("train_*.csv"):
+        p.unlink(missing_ok=True)
+    for p in settings.assets_dir.glob("sample_*.csv"):
+        p.unlink(missing_ok=True)
+    for p in settings.groundtruth_dir.glob("groundtruth_*.csv"):
+        p.unlink(missing_ok=True)
+
+    return RedirectResponse("/admin?flash=reset_done", status_code=303)

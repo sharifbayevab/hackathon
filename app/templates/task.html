@@ -25,13 +25,22 @@
           {% if deadline_passed %}
             <span class="text-red-600">{{ t('deadline_passed') }}</span>
           {% elif competition.deadline %}
-            {{ competition.deadline|dt }}{% if time_left %} · {{ time_left }}{% endif %}
+            {{ competition.deadline|dt }}
           {% else %}
             {{ t('n_a') }}
           {% endif %}
         </span>
       </div>
-      <div class="prose prose-slate max-w-none whitespace-pre-wrap">{{ competition.description }}</div>
+
+      {% if competition.deadline and not deadline_passed %}
+        <div id="countdown" class="mb-4 p-3 bg-slate-900 text-white rounded-lg flex items-center justify-between"
+             data-deadline="{{ competition.deadline|iso }}">
+          <span class="text-sm uppercase tracking-wide text-slate-300">{{ t('time_left') }}</span>
+          <span class="font-mono text-lg" data-countdown-display>—</span>
+        </div>
+      {% endif %}
+
+      <div class="md-content prose prose-slate max-w-none">{{ description_for(competition, lang)|md }}</div>
 
       <div class="mt-6 flex flex-wrap gap-3">
         {% if competition.train_path %}

@@ -16,6 +16,10 @@
   </div>
 {% elif flash == 'rescored' %}
   <div class="mb-4 p-3 bg-green-50 text-green-700 rounded">{{ t('admin_rescored') }}</div>
+{% elif flash == 'reset_done' %}
+  <div class="mb-4 p-3 bg-green-50 text-green-700 rounded">{{ t('admin_reset_done') }}</div>
+{% elif flash == 'reset_cancelled' %}
+  <div class="mb-4 p-3 bg-amber-50 text-amber-800 rounded">{{ t('admin_reset_cancelled') }}</div>
 {% endif %}
 
 <div class="grid lg:grid-cols-3 gap-6">
@@ -29,8 +33,24 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">{{ t('admin_description') }}</label>
-        <textarea name="description" rows="6"
-                  class="w-full border rounded-lg px-3 py-2 font-mono text-sm">{{ competition.description if competition else '' }}</textarea>
+        <p class="text-xs text-slate-500 mb-2">{{ t('admin_description_hint') }}</p>
+        <div class="grid sm:grid-cols-3 gap-3">
+          {% for code in ['uz', 'ru', 'en'] %}
+            <div>
+              <label class="block text-xs font-medium mb-1 uppercase">{{ code }}</label>
+              <input type="file" name="description_{{ code }}_file" accept=".md,text/markdown,text/plain"
+                     class="block w-full text-sm">
+              {% if competition %}
+                {% set existing = competition['description_' ~ code] %}
+                {% if existing %}
+                  <p class="text-xs text-green-700 mt-1">✓ {{ existing|length }} chars</p>
+                {% else %}
+                  <p class="text-xs text-slate-400 mt-1">—</p>
+                {% endif %}
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
       </div>
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
@@ -44,7 +64,7 @@
         <div>
           <label class="block text-sm font-medium mb-1">{{ t('admin_deadline') }}</label>
           <input type="datetime-local" name="deadline"
-                 value="{% if competition and competition.deadline %}{{ competition.deadline.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"
+                 value="{% if competition and competition.deadline %}{{ competition.deadline|tashkent_local }}{% endif %}"
                  class="w-full border rounded-lg px-3 py-2">
         </div>
         <div>
@@ -120,5 +140,20 @@
       {% endif %}
     </div>
   </div>
+</div>
+
+<div class="mt-10 border-2 border-red-200 bg-red-50 rounded-2xl p-6">
+  <h2 class="font-semibold text-red-800 mb-2">{{ t('admin_danger_zone') }}</h2>
+  <p class="text-sm text-red-700 mb-4">{{ t('admin_reset_explain') }}</p>
+  <form method="post" action="/admin/reset" class="flex flex-col sm:flex-row gap-3 sm:items-center">
+    <input type="text" name="confirm" placeholder="RESET" required
+           class="flex-1 border border-red-300 rounded-lg px-3 py-2 bg-white text-sm font-mono"
+           autocomplete="off">
+    <button type="submit"
+            onclick="return confirm('{{ t('admin_reset_confirm') }}')"
+            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm font-medium">
+      {{ t('admin_reset_button') }}
+    </button>
+  </form>
 </div>
 {% endblock %}
