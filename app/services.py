@@ -48,6 +48,7 @@ class LeaderboardRow:
     group_name: str
     score: float
     submissions_count: int
+    best_at: datetime
 
 
 def compute_leaderboard(
@@ -56,28 +57,50 @@ def compute_leaderboard(
     metric = Metric(competition.metric)
     higher = is_higher_better(metric)
     score_col = Submission.private_score if use_private else Submission.public_score
-    best_agg = func.max(score_col) if higher else func.min(score_col)
+    score_order = score_col.desc() if higher else score_col.asc()
+
+    # Per-participant: pick best score; on ties take the earliest submission.
+    rn = func.row_number().over(
+        partition_by=Submission.participant_id,
+        order_by=[score_order, Submission.created_at.asc()],
+    ).label("rn")
+    cnt = func.count().over(partition_by=Submission.participant_id).label("cnt")
+
+    inner = (
+        select(
+            Submission.participant_id.label("pid"),
+            score_col.label("score"),
+            Submission.created_at.label("best_at"),
+            rn,
+            cnt,
+        )
+        .where(
+            Submission.competition_id == competition.id,
+            Submission.status == SubmissionStatus.scored.value,
+            score_col.isnot(None),
+        )
+        .subquery()
+    )
 
     stmt = (
         select(
             Participant.id,
             Participant.full_name,
             Participant.group_name,
-            best_agg.label("best_score"),
-            func.count(Submission.id).label("count"),
+            inner.c.score,
+            inner.c.best_at,
+            inner.c.cnt,
         )
-        .join(Submission, Submission.participant_id == Participant.id)
-        .where(
-            Submission.competition_id == competition.id,
-            Submission.status == SubmissionStatus.scored.value,
-            score_col.isnot(None),
+        .join(inner, inner.c.pid == Participant.id)
+        .where(inner.c.rn == 1)
+        .order_by(
+            inner.c.score.desc() if higher else inner.c.score.asc(),
+            inner.c.best_at.asc(),
         )
-        .group_by(Participant.id, Participant.full_name, Participant.group_name)
-        .order_by(best_agg.desc() if higher else best_agg.asc())
     )
 
     rows = []
-    for i, (pid, name, grp, score, cnt) in enumerate(db.execute(stmt).all(), start=1):
+    for i, (pid, name, grp, score, best_at, cnt) in enumerate(db.execute(stmt).all(), start=1):
         rows.append(
             LeaderboardRow(
                 rank=i,
@@ -86,6 +109,7 @@ def compute_leaderboard(
                 group_name=grp,
                 score=float(score),
                 submissions_count=int(cnt),
+                best_at=best_at,
             )
         )
     return rows

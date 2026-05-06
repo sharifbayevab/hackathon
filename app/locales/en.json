@@ -40,7 +40,9 @@
   "group": "Group",
   "score": "Score",
   "submissions_count": "Submissions",
+  "best_at": "Time",
   "leaderboard_empty": "No results yet",
+  "download_csv": "Download CSV",
 
   "admin_login_title": "Admin login",
   "username": "Username",

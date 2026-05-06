@@ -40,7 +40,9 @@
   "group": "Guruh",
   "score": "Ball",
   "submissions_count": "Yuborishlar",
+  "best_at": "Vaqt",
   "leaderboard_empty": "Hali natijalar yo‘q",
+  "download_csv": "CSV yuklab olish",
 
   "admin_login_title": "Admin kirish",
   "username": "Login",

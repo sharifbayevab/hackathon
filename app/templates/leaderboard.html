@@ -1,15 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="bg-white border rounded-2xl p-6">
-  <div class="flex items-baseline justify-between mb-4">
+  <div class="flex items-baseline justify-between gap-4 mb-4 flex-wrap">
     <h1 class="text-2xl font-semibold">{{ t('leaderboard_title') }}</h1>
-    <span class="text-sm text-slate-500">
-      {% if use_private %}
-        {{ t('leaderboard_private_note') }}
-      {% else %}
-        {{ t('leaderboard_public_note') }}
+    <div class="flex items-center gap-4 text-sm">
+      <span class="text-slate-500">
+        {% if use_private %}
+          {{ t('leaderboard_private_note') }}
+        {% else %}
+          {{ t('leaderboard_public_note') }}
+        {% endif %}
+      </span>
+      {% if rows %}
+        <a href="/leaderboard.csv"
+           class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 whitespace-nowrap">
+          ⬇ {{ t('download_csv') }}
+        </a>
       {% endif %}
-    </span>
+    </div>
   </div>
 
   {% if not competition %}
@@ -26,6 +34,7 @@
             <th>{{ t('group') }}</th>
             <th class="text-right">{{ t('score') }}</th>
             <th class="text-right">{{ t('submissions_count') }}</th>
+            <th class="text-right whitespace-nowrap">{{ t('best_at') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -38,6 +47,7 @@
               <td class="text-slate-600">{{ row.group_name }}</td>
               <td class="text-right font-mono">{{ row.score|score }}</td>
               <td class="text-right text-slate-500">{{ row.submissions_count }}</td>
+              <td class="text-right text-slate-500 font-mono whitespace-nowrap">{{ row.best_at|dt }}</td>
             </tr>
           {% endfor %}
         </tbody>

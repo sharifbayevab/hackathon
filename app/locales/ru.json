@@ -40,7 +40,9 @@
   "group": "Группа",
   "score": "Балл",
   "submissions_count": "Сабмитов",
+  "best_at": "Время",
   "leaderboard_empty": "Пока нет результатов",
+  "download_csv": "Скачать CSV",
 
   "admin_login_title": "Вход для администратора",
   "username": "Логин",

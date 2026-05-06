@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import csv
+import io
 import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+TASHKENT = ZoneInfo("Asia/Tashkent")
 
 from app.auth import (
     LANG_COOKIE,
@@ -224,6 +229,39 @@ def leaderboard(request: Request, db: Session = Depends(get_db)):
             "rows": rows,
             "use_private": use_private,
         },
+    )
+
+
+@router.get("/leaderboard.csv")
+def leaderboard_csv(db: Session = Depends(get_db)):
+    competition = get_active_competition(db)
+    if competition is None:
+        raise HTTPException(404)
+    use_private = deadline_passed(competition)
+    rows = compute_leaderboard(db, competition, use_private=use_private)
+
+    score_col = "private_score" if use_private else "public_score"
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["rank", "full_name", "group_name", score_col, "submissions", "best_at_tashkent"])
+    for r in rows:
+        ts = r.best_at
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        writer.writerow([
+            r.rank,
+            r.full_name,
+            r.group_name,
+            f"{r.score:.6f}",
+            r.submissions_count,
+            ts.astimezone(TASHKENT).strftime("%Y-%m-%d %H:%M:%S"),
+        ])
+
+    fname = f"leaderboard_{competition.id}_{datetime.now(TASHKENT).strftime('%Y%m%d_%H%M')}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
 
